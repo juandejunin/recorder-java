@@ -1,81 +1,58 @@
 package org.juandejunin;
 
-import javax.sound.sampled.*;
-import java.io.File;
-import java.io.IOException;
+import javax.sound.sampled.AudioFileFormat;
+import javax.sound.sampled.AudioFormat;
+import javax.sound.sampled.AudioInputStream;
+import javax.sound.sampled.AudioSystem;
+import javax.sound.sampled.DataLine;
+import javax.sound.sampled.TargetDataLine;
 
 public class RecorderJava {
-    public static void main(String[] args) throws LineUnavailableException, InterruptedException {
-        AudioFormat format = new AudioFormat(1600, 8, 2, true, true);
-        DataLine.Info info = new DataLine.Info(TargetDataLine.class, format);
 
-        if (!AudioSystem.isLineSupported(info)) {
-            System.out.println("La línea no es compatible");
-            return; // Salir del programa si la línea no es compatible
+    public void recordAudio() {
+        try {
+            // Configuración del formato de audio
+            AudioFormat format = new AudioFormat(AudioFormat.Encoding.PCM_SIGNED, 44100, 16, 2, 4, 44100, false);
+
+//            // Obtención del micrófono
+           DataLine.Info info = new DataLine.Info(TargetDataLine.class, format);
+            System.out.println(info);
+
+            // Obtención del micrófono
+            TargetDataLine targetDataLine = AudioSystem.getTargetDataLine(format);
+            targetDataLine.open(format);
+            targetDataLine.start();
+            
+            
+            if (!AudioSystem.isLineSupported(info)) {
+                System.out.println("La línea no es compatible");
+                return; // Salir del programa si la línea no es compatible
+            }
+
+            System.out.println("Iniciando grabación");
+
+            targetDataLine.start();
+            
+                        // Creación del hilo para la grabación
+            Thread grabacionThread = new Thread(() -> {
+                AudioInputStream audioInputStream = new AudioInputStream(targetDataLine);
+                try {
+                    AudioSystem.write(audioInputStream, AudioFileFormat.Type.WAVE, new java.io.File("grabacion.wav"));
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            });
+
+            grabacionThread.start();
+
+            Thread.sleep(15000);
+            targetDataLine.stop();
+            targetDataLine.close();
+
+            System.out.println("Prueba de sonido finalizada");
+
+        } catch (Exception e) {
+            e.printStackTrace();
         }
-
-        TargetDataLine targetDataLine = (TargetDataLine) AudioSystem.getLine(info);
-
-        targetDataLine.open();
-
-        System.out.println("Iniciando grabación");
-
-        targetDataLine.start();
-
-        // Función para verificar si se está accediendo al micrófono
-        Thread microphoneStatusChecker = new Thread(() -> {
-            while (true) {
-                // Obtener el nivel de amplitud actual
-                byte[] buffer = new byte[targetDataLine.getBufferSize() / 5];
-                int bytesRead = targetDataLine.read(buffer, 0, buffer.length);
-                int maxAmplitude = 0;
-                for (int i = 0; i < bytesRead; i++) {
-                    maxAmplitude = Math.max(maxAmplitude, Math.abs(buffer[i]));
-                }
-
-                // Puedes ajustar este umbral según tus necesidades
-                if (maxAmplitude > 50) {
-                    System.out.println("Sonido detectado en el micrófono");
-                } else {
-                    System.out.println("Sin sonido en el micrófono");
-                }
-
-                try {
-                    Thread.sleep(1000); // Puedes ajustar el intervalo de verificación
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-            }
-        }, "MicrophoneStatusChecker");
-
-        microphoneStatusChecker.setDaemon(true);
-        microphoneStatusChecker.start();
-
-        // Hilo para detener la grabación después de cierto tiempo
-        Thread stopper = new Thread(() -> {
-            AudioInputStream audioStream = new AudioInputStream(targetDataLine);
-
-            File wavFile = new File("D:" + File.separator + "recording.wav");
-
-            try {
-                AudioSystem.write(audioStream, AudioFileFormat.Type.WAVE, wavFile);
-            } catch (IOException e) {
-                e.printStackTrace();
-            } finally {
-                try {
-                    audioStream.close();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            }
-        }, "HiloDetenedor");
-
-        stopper.start();
-
-        Thread.sleep(5000);
-        targetDataLine.stop();
-        targetDataLine.close();
-
-        System.out.println("Prueba de sonido finalizada");
     }
 }
